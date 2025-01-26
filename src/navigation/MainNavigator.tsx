@@ -14,27 +14,18 @@ const ProfileStack = createNativeStackNavigator();
 
 const ProfileStackNavigator = () => {
   return (
-    <ProfileStack.Navigator>
+    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
       <ProfileStack.Screen 
         name="ProfileMain" 
         component={ProfileScreen}
-        options={{
-          title: 'Profil',
-        }}
       />
       <ProfileStack.Screen 
         name="UpdateEmail" 
         component={UpdateEmailScreen}
-        options={{
-          title: 'E-Mail ändern',
-        }}
       />
       <ProfileStack.Screen 
         name="UpdatePassword" 
         component={UpdatePasswordScreen}
-        options={{
-          title: 'Passwort ändern',
-        }}
       />
     </ProfileStack.Navigator>
   );
@@ -44,6 +35,7 @@ export const MainNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
+        headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
@@ -59,6 +51,11 @@ export const MainNavigator = () => {
         },
         tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: 'gray',
+        tabBarStyle: {
+          width: '100%',
+          maxWidth: 800,
+          alignSelf: 'center',
+        },
       })}
     >
       <Tab.Screen 
@@ -73,7 +70,6 @@ export const MainNavigator = () => {
         component={ProfileStackNavigator}
         options={{
           title: 'Profil',
-          headerShown: false,
         }}
       />
       <Tab.Screen

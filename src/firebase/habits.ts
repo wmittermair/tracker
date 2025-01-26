@@ -1,6 +1,6 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, Timestamp, query, orderBy, where } from 'firebase/firestore';
 import { db } from './config';
-import { Habit, HabitEntry } from '../types/types';
+import { Habit, HabitHistoryEntry } from '../types/types';
 
 const COLLECTION_NAME = 'habits';
 
@@ -31,100 +31,105 @@ export const testFirestore = async () => {
 
 // Habit hinzufügen
 export const addHabit = async (userId: string, name: string): Promise<Habit> => {
-  console.log('Füge Habit hinzu für User:', userId, 'Name:', name);
   const habitData = {
-    userId,
     name,
-    createdAt: Timestamp.now(),
-    streak: 0,
-    lastCompletedDate: null,
-    history: []
+    userId,
+    completedToday: false,
+    currentStreak: 0,
+    history: [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
-  try {
-    const docRef = await addDoc(collection(db, COLLECTION_NAME), habitData);
-    console.log('Habit erfolgreich hinzugefügt mit ID:', docRef.id);
-    return {
-      id: docRef.id,
-      ...habitData,
-      history: []
-    };
-  } catch (error) {
-    console.error('Fehler beim Hinzufügen des Habits:', error);
-    throw error;
-  }
+  const docRef = await addDoc(collection(db, COLLECTION_NAME), habitData);
+  return { ...habitData, id: docRef.id };
 };
 
 // Alle Habits laden
 export const loadHabits = async (userId: string): Promise<Habit[]> => {
-  console.log('Lade Habits für User:', userId);
-  try {
-    // Optimierte Abfrage mit Index
-    const q = query(
-      collection(db, COLLECTION_NAME), 
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
-    const habits = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Habit[];
-    
-    console.log('Geladene Habits:', habits);
-    return habits;
-  } catch (error) {
-    console.error('Fehler beim Laden der Habits:', error);
-    throw error;
+  const habitsQuery = query(
+    collection(db, COLLECTION_NAME),
+    where('userId', '==', userId)
+  );
+  
+  const snapshot = await getDocs(habitsQuery);
+  return snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+  } as Habit));
+};
+
+// Berechnet den aktuellen Streak basierend auf der History
+const calculateStreak = (history: HabitHistoryEntry[]): number => {
+  const sortedHistory = [...history].sort((a, b) => b.date.localeCompare(a.date));
+  let streak = 0;
+  const today = new Date();
+  const localDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000));
+  const todayStr = localDate.toISOString().split('T')[0];
+  
+  // Wenn heute noch nicht erledigt, prüfe ab gestern
+  let currentDate = todayStr;
+  
+  for (const entry of sortedHistory) {
+    if (entry.date === currentDate && entry.completed) {
+      streak++;
+      // Berechne das vorherige Datum
+      const prevDate = new Date(currentDate);
+      prevDate.setDate(prevDate.getDate() - 1);
+      currentDate = prevDate.toISOString().split('T')[0];
+    } else if (entry.date === currentDate && !entry.completed) {
+      break;
+    } else if (entry.date < currentDate) {
+      break;
+    }
   }
+  
+  return streak;
 };
 
 // Habit als erledigt/nicht erledigt markieren
-export const toggleHabit = async (habit: Habit): Promise<void> => {
-  try {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    
-    // Wenn der Habit bereits heute abgeschlossen wurde
-    const lastCompletedDate = habit.lastCompletedDate ? new Date(habit.lastCompletedDate) : null;
-    const lastCompletedDay = lastCompletedDate?.toISOString().split('T')[0];
-    
-    const entry: HabitEntry = {
-      date: today,
-      completed: !habit.lastCompletedDate || lastCompletedDay !== today,
-      timestamp: now
-    };
+export const toggleHabit = async (habit: Habit) => {
+  // Erstelle ein Datum im lokalen Zeitzonenkontext
+  const today = new Date();
+  const localDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000));
+  const dateStr = localDate.toISOString().split('T')[0];
 
-    // Streak-Logik
-    let newStreak = habit.streak;
-    if (!habit.lastCompletedDate || lastCompletedDay !== today) {
-      // Wenn der Habit noch nicht heute abgeschlossen wurde, erhöhe den Streak
-      newStreak = habit.streak + 1;
-    } else {
-      // Wenn der Habit bereits heute abgeschlossen wurde, setze den Streak zurück
-      newStreak = 0;
-    }
+  const habitRef = doc(db, COLLECTION_NAME, habit.id);
+  const newCompletedState = !habit.completedToday;
+  
+  const historyEntry = {
+    date: dateStr,
+    completed: newCompletedState,
+    timestamp: new Date(),
+  };
 
-    const docRef = doc(db, COLLECTION_NAME, habit.id);
-    await updateDoc(docRef, {
-      lastCompletedDate: !habit.lastCompletedDate || lastCompletedDay !== today ? now : null,
-      streak: newStreak,
-      history: [...habit.history, entry]
-    });
-  } catch (error) {
-    console.error('Fehler beim Aktualisieren des Habits:', error);
-    throw error;
-  }
+  // Entferne vorherige Einträge von heute
+  const filteredHistory = habit.history.filter(entry => 
+    entry.date !== dateStr
+  );
+
+  const updatedHistory = [...filteredHistory, historyEntry];
+  const currentStreak = calculateStreak(updatedHistory);
+
+  await updateDoc(habitRef, {
+    completedToday: newCompletedState,
+    history: updatedHistory,
+    currentStreak,
+    updatedAt: new Date(),
+  });
+
+  return {
+    ...habit,
+    completedToday: newCompletedState,
+    history: updatedHistory,
+    currentStreak,
+    updatedAt: new Date(),
+  };
 };
 
 // Habit löschen
-export const deleteHabit = async (id: string): Promise<void> => {
-  try {
-    await deleteDoc(doc(db, COLLECTION_NAME, id));
-  } catch (error) {
-    console.error('Fehler beim Löschen des Habits:', error);
-    throw error;
-  }
+export const deleteHabit = async (habitId: string) => {
+  await deleteDoc(doc(db, COLLECTION_NAME, habitId));
 };
 
 export const getHabits = async (userId: string) => {

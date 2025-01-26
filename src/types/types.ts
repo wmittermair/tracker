@@ -1,7 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 
 // Einzelner Eintrag in der History eines Habits
-export interface HabitEntry {
+export interface HabitHistoryEntry {
   date: string;
   completed: boolean;
   timestamp: Date;
@@ -11,10 +11,14 @@ export interface HabitEntry {
 export interface Habit {
   id: string;
   name: string;
-  createdAt: Date | Timestamp;
-  streak: number;
-  lastCompletedDate: Date | null;
-  history: HabitEntry[];
+  description?: string;
+  category?: string;
+  completedToday: boolean;
+  currentStreak: number;
+  userId: string;
+  history: HabitHistoryEntry[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Props für die HabitItem Komponente

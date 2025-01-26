@@ -1,182 +1,264 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { useAuth, logoutUser } from '../firebase/auth';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, Text, Image, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS, FONT, SPACING, TYPOGRAPHY } from '../theme/theme';
+import { Header } from '../components/Header';
+import { Card } from '../components/Card';
+import { Button } from '../components/Button';
 import { Ionicons } from '@expo/vector-icons';
-import { CommonActions } from '@react-navigation/native';
-import { LogoutDialog } from '../components/LogoutDialog';
+import { useAuth, logoutUser } from '../firebase/auth';
+import { PageContainer } from '../components/PageContainer';
+import { loadHabits } from '../firebase/habits';
+import { calculateAchievements } from '../utils/achievements';
+import { Habit } from '../types/types';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-type Props = {
-  navigation: NativeStackNavigationProp<any>;
+type ProfileStackParamList = {
+  ProfileMain: undefined;
+  UpdateEmail: undefined;
+  UpdatePassword: undefined;
 };
 
-export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList>;
 
-  const handleLogout = async () => {
-    if (loading) return;
-    
-    setLoading(true);
-    console.log('ProfileScreen: Starte Abmeldung');
-    
+export const ProfileScreen = () => {
+  const { user } = useAuth();
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
+
+  useEffect(() => {
+    if (user) {
+      loadUserData();
+    }
+  }, [user]);
+
+  const loadUserData = async () => {
+    if (!user) return;
     try {
-      await logoutUser();
-      console.log('ProfileScreen: Abmeldung erfolgreich');
-      
-      // Navigiere zum Auth-Screen und lösche den Navigation-Stack
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [
-            { name: 'Auth' }
-          ]
-        })
-      );
-    } catch (error: any) {
-      console.error('ProfileScreen: Abmeldefehler:', error);
-      setShowLogoutDialog(false);
+      setIsLoading(true);
+      const loadedHabits = await loadHabits(user.uid);
+      setHabits(loadedHabits);
+    } catch (error) {
+      console.error('Fehler beim Laden der Daten:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (!user) {
-    console.log('ProfileScreen: Kein Benutzer gefunden');
-    return null;
-  }
+  const achievements = calculateAchievements(habits);
+
+  // Berechne Statistiken aus den echten Daten
+  const stats = {
+    daysActive: habits.reduce((acc, habit) => 
+      acc + habit.history.filter(entry => entry.completed).length, 0),
+    habitsCompleted: habits.filter(h => h.completedToday).length,
+    longestStreak: Math.max(...habits.map(h => h.currentStreak || 0), 0),
+  };
 
   return (
-    <View style={styles.container}>
-      <LogoutDialog
-        visible={showLogoutDialog}
-        onConfirm={handleLogout}
-        onCancel={() => setShowLogoutDialog(false)}
-      />
-
-      <View style={styles.profileHeader}>
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>
-            {user.email?.[0].toUpperCase() || '?'}
-          </Text>
+    <PageContainer>
+      <Header title="Profil" />
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Profil Header */}
+        <View style={styles.profileHeader}>
+          <View style={styles.emailContainer}>
+            <Text style={styles.email}>{user?.email}</Text>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => navigation.navigate('UpdateEmail')}
+            >
+              <Ionicons name="pencil" size={20} color={COLORS.primary} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('UpdatePassword')}
+            style={styles.passwordLink}
+          >
+            <Text style={styles.passwordLinkText}>Passwort ändern</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.emailText}>{user.email}</Text>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Konto</Text>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={() => navigation.navigate('UpdateEmail')}
-          disabled={loading}
-        >
-          <Text style={[styles.menuItemText, loading && styles.textDisabled]}>
-            E-Mail ändern
-          </Text>
-          <Ionicons name="chevron-forward" size={20} color={loading ? '#ccc' : '#999'} />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigation.navigate('UpdatePassword')}
-          disabled={loading}
-        >
-          <Text style={[styles.menuItemText, loading && styles.textDisabled]}>
-            Passwort ändern
-          </Text>
-          <Ionicons name="chevron-forward" size={20} color={loading ? '#ccc' : '#999'} />
-        </TouchableOpacity>
-      </View>
+        {/* Statistiken */}
+        <Card variant="elevated" style={styles.statsCard}>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.daysActive}</Text>
+              <Text style={styles.statLabel}>Aktive Tage</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.habitsCompleted}</Text>
+              <Text style={styles.statLabel}>Heute erledigt</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{stats.longestStreak}</Text>
+              <Text style={styles.statLabel}>Längster Streak</Text>
+            </View>
+          </View>
+        </Card>
 
-      <TouchableOpacity 
-        style={[styles.logoutButton, loading && styles.buttonDisabled]}
-        onPress={() => setShowLogoutDialog(true)}
-        disabled={loading}
-        activeOpacity={0.7}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <Text style={styles.logoutButtonText}>Abmelden</Text>
-        )}
-      </TouchableOpacity>
-    </View>
+        {/* Achievements */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Achievements</Text>
+          {achievements.map(achievement => (
+            <Card key={achievement.id} style={styles.achievementCard}>
+              <View style={styles.achievementHeader}>
+                <View style={styles.achievementIcon}>
+                  <Ionicons name={achievement.icon as any} size={24} color={COLORS.primary} />
+                </View>
+                <View style={styles.achievementInfo}>
+                  <Text style={styles.achievementTitle}>{achievement.title}</Text>
+                  <Text style={styles.achievementDescription}>{achievement.description}</Text>
+                </View>
+              </View>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${achievement.progress * 100}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {Math.round(achievement.progress * 100)}%
+              </Text>
+            </Card>
+          ))}
+        </View>
+
+        {/* Abmelden Button */}
+        <View style={styles.actions}>
+          <Button
+            title="Abmelden"
+            variant="secondary"
+            onPress={logoutUser}
+            style={styles.actionButton}
+          />
+        </View>
+      </ScrollView>
+    </PageContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  content: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   profileHeader: {
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    padding: SPACING.xl,
   },
-  avatarPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: 'bold',
-  },
-  emailText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  section: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
-  },
-  menuItem: {
+  emailContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  email: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+    marginRight: SPACING.xs,
+  },
+  editButton: {
+    padding: SPACING.xs,
+  },
+  passwordLink: {
+    marginTop: SPACING.sm,
+  },
+  passwordLinkText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+  },
+  statsCard: {
+    marginHorizontal: SPACING.md,
+  },
+  statsRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  menuItemText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  textDisabled: {
-    color: '#ccc',
-  },
-  logoutButton: {
-    margin: 20,
-    backgroundColor: '#ff3b30',
-    padding: 15,
-    borderRadius: 8,
     alignItems: 'center',
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-      },
-    }),
+    padding: SPACING.md,
   },
-  buttonDisabled: {
-    opacity: 0.7,
-    backgroundColor: '#ffaa99',
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
   },
-  logoutButtonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: 'bold',
+  statValue: {
+    ...TYPOGRAPHY.h2,
+    color: COLORS.text,
+  },
+  statLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+  },
+  statDivider: {
+    width: 1,
+    height: '70%',
+    backgroundColor: COLORS.border,
+  },
+  section: {
+    padding: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  sectionTitle: {
+    ...TYPOGRAPHY.h3,
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  achievementCard: {
+    marginBottom: SPACING.md,
+  },
+  achievementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  achievementIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.md,
+  },
+  achievementInfo: {
+    flex: 1,
+  },
+  achievementTitle: {
+    ...FONT.medium,
     fontSize: 16,
+    color: COLORS.text,
+  },
+  achievementDescription: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: COLORS.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 2,
+  },
+  progressText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+    textAlign: 'right',
+  },
+  actions: {
+    padding: SPACING.md,
+    paddingTop: SPACING.xl,
+  },
+  actionButton: {
+    marginBottom: SPACING.sm,
   },
 }); 

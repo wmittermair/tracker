@@ -1,82 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
+import { COLORS, FONT, SPACING, TYPOGRAPHY } from '../theme/theme';
+import { Header } from '../components/Header';
+import { Card } from '../components/Card';
+import { Ionicons } from '@expo/vector-icons';
+import { PageContainer } from '../components/PageContainer';
 import { useAuth } from '../firebase/auth';
+import { loadHabits } from '../firebase/habits';
+import { Habit } from '../types/types';
 import { generateGeminiResponse, GeminiMessage, ChatContext } from '../services/gemini';
 import { saveMessage, getChatHistory } from '../firebase/chat';
-import { loadHabits } from '../firebase/habits';
+import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
 
 export const CoachChatScreen = () => {
   const { user } = useAuth();
+  const [message, setMessage] = useState('');
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [messages, setMessages] = useState<GeminiMessage[]>([]);
-  const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  // Lade Chat-Verlauf beim Start und wenn sich der User ändert
   useEffect(() => {
     if (user) {
+      loadUserHabits();
       loadChatHistory();
-    } else {
-      setMessages([]);
     }
   }, [user]);
+
+  const loadUserHabits = async () => {
+    if (!user) return;
+    const loadedHabits = await loadHabits(user.uid);
+    setHabits(loadedHabits);
+  };
 
   const loadChatHistory = async () => {
     if (!user) return;
     try {
-      console.log('Lade Chat-Verlauf...');
       const history = await getChatHistory(user.uid);
-      console.log('Chat-Verlauf geladen:', history.length, 'Nachrichten');
       setMessages(history);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Fehler beim Laden des Chat-Verlaufs:', error);
-      // Zeige Fehlermeldung nur an, wenn es nicht der Index-Fehler ist
-      if (!error.message?.includes('Index fehlt')) {
-        const errorMessage: GeminiMessage = {
-          role: 'assistant',
-          content: `Fehler beim Laden des Chat-Verlaufs: ${error.message}`,
-          timestamp: Date.now(),
-        };
-        setMessages([errorMessage]);
-      }
-    } finally {
-      setIsInitialLoading(false);
     }
   };
 
-  const sendMessage = async () => {
-    if (!inputText.trim() || !user) return;
+  const handleSendMessage = async () => {
+    if (!message.trim() || !user) return;
 
     const userMessage: GeminiMessage = {
       role: 'user',
-      content: inputText,
+      content: message,
       timestamp: Date.now(),
     };
 
     try {
       setIsLoading(true);
-      
-      // Speichere User-Nachricht
-      console.log('Speichere User-Nachricht:', userMessage);
       setMessages(prev => [...prev, userMessage]);
-      const messageId = await saveMessage(user.uid, userMessage);
-      console.log('User-Nachricht gespeichert mit ID:', messageId);
-      setInputText('');
+      await saveMessage(user.uid, userMessage);
+      setMessage('');
 
-      // Hole Kontext für Gemini
-      console.log('Lade Habits für Kontext...');
-      const habits = await loadHabits(user.uid);
-      console.log('Geladene Habits:', habits);
-      
       const context: ChatContext = {
         habits,
-        habitHistory: [], // TODO: Implementiere Habit-History
+        habitHistory: [],
         userName: user.displayName || 'Nutzer',
       };
 
-      console.log('Sende Anfrage an Gemini...');
       const aiResponse = await generateGeminiResponse([...messages, userMessage], context);
-      console.log('Gemini Antwort erhalten:', aiResponse);
       
       const assistantMessage: GeminiMessage = {
         role: 'assistant',
@@ -84,143 +72,263 @@ export const CoachChatScreen = () => {
         timestamp: Date.now(),
       };
 
-      console.log('Speichere Assistenten-Nachricht:', assistantMessage);
-      const assistantMessageId = await saveMessage(user.uid, assistantMessage);
-      console.log('Assistenten-Nachricht gespeichert mit ID:', assistantMessageId);
+      await saveMessage(user.uid, assistantMessage);
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error: any) {
-      console.error('Fehler im Chat:', error);
-      // Zeige Fehlermeldung an
-      const errorMessage: GeminiMessage = {
-        role: 'assistant',
-        content: `Entschuldigung, es gab einen Fehler: ${error.message}`,
-        timestamp: Date.now(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
+    } catch (error) {
+      console.error('Fehler beim Senden der Nachricht:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const renderMessage = ({ item }: { item: GeminiMessage }) => (
-    <View style={[
-      styles.messageContainer,
-      item.role === 'user' ? styles.userMessage : styles.assistantMessage
-    ]}>
-      <Text style={styles.messageText}>{item.content}</Text>
-      <Text style={styles.timestamp}>
-        {new Date(item.timestamp).toLocaleTimeString()}
-      </Text>
-    </View>
-  );
-
-  if (isInitialLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.timestamp.toString()}
-        style={styles.chatList}
-        inverted={false}
-        contentContainerStyle={styles.chatListContent}
-      />
-      <View style={styles.inputContainer}>
+    <PageContainer>
+      <Header title="Coach Chat" />
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Chat-Bereich */}
+        <View style={styles.section}>
+          {messages.length > 0 ? (
+            <>
+              {messages.map((msg, index) => {
+                const messageDate = new Date(msg.timestamp);
+                const showDate = index === 0 || new Date(messages[index - 1].timestamp).toDateString() !== messageDate.toDateString();
+                
+                return (
+                  <React.Fragment key={msg.timestamp}>
+                    {showDate && (
+                      <View style={styles.dateContainer}>
+                        <Text style={styles.dateText}>
+                          {format(messageDate, 'd.M.yyyy', { locale: de })}
+                        </Text>
+                      </View>
+                    )}
+                    <View 
+                      style={[
+                        styles.messageContainer,
+                        msg.role === 'user' ? styles.userMessageContainer : styles.coachMessageContainer
+                      ]}
+                    >
+                      <View style={msg.role === 'user' ? styles.userMessage : styles.coachMessage}>
+                        <Text style={msg.role === 'user' ? styles.userMessageText : styles.messageText}>
+                          {msg.content}
+                        </Text>
+                        <Text style={[
+                          styles.timeText,
+                          msg.role === 'user' ? styles.userTimeText : styles.coachTimeText
+                        ]}>
+                          {format(messageDate, 'HH:mm')}
+                        </Text>
+                      </View>
+                    </View>
+                  </React.Fragment>
+                );
+              })}
+
+              {isLoading && (
+                <View style={[styles.messageContainer, styles.coachMessageContainer]}>
+                  <View style={[styles.coachMessage, { width: '80%' }]}>
+                    <Text style={styles.messageText}>Coach schreibt gerade...</Text>
+                    <Text style={styles.coachTimeText}>
+                      {format(new Date(), 'HH:mm')}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              <Card variant="elevated" style={styles.chatCard}>
+                <View style={styles.messageContainer}>
+                  <View style={styles.coachMessage}>
+                    <Text style={styles.messageText}>
+                      Hallo! Ich bin dein persönlicher Coach. Wie kann ich dir heute helfen?
+                    </Text>
+                    <Text style={styles.coachTimeText}>
+                      {format(new Date(), 'HH:mm')}
+                    </Text>
+                  </View>
+                </View>
+              </Card>
+
+              {/* Tipps - nur anzeigen wenn noch keine Nachrichten existieren */}
+              <Card variant="elevated" style={styles.tipsCard}>
+                <View style={styles.tipContent}>
+                  <Ionicons name="information-circle" size={24} color={COLORS.primary} />
+                  <Text style={styles.tipTitle}>So nutzt du den Coach</Text>
+                  <Text style={styles.tipText}>
+                    • Stelle konkrete Fragen zu deinen Habits{'\n'}
+                    • Bitte um Tipps zur Verbesserung{'\n'}
+                    • Teile deine Erfolge und Herausforderungen
+                  </Text>
+                </View>
+              </Card>
+            </>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Chat Input */}
+      <Card style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="Nachricht an deinen Coach..."
+          placeholder="Schreibe eine Nachricht..."
+          value={message}
+          onChangeText={setMessage}
           multiline
         />
-        <TouchableOpacity
-          style={styles.sendButton}
-          onPress={sendMessage}
-          disabled={isLoading || !inputText.trim()}
+        <TouchableOpacity 
+          style={[styles.sendButton, (!message.trim() || isLoading) && styles.sendButtonDisabled]}
+          onPress={handleSendMessage}
+          disabled={!message.trim() || isLoading}
         >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.sendButtonText}>Senden</Text>
-          )}
+          <Ionicons 
+            name="send" 
+            size={24} 
+            color={!message.trim() || isLoading ? COLORS.textSecondary : COLORS.background} 
+          />
         </TouchableOpacity>
-      </View>
-    </View>
+      </Card>
+    </PageContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  content: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.border + '30',
   },
-  chatList: {
-    flex: 1,
-    padding: 10,
+  section: {
+    padding: SPACING.md,
   },
   messageContainer: {
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+  },
+  userMessageContainer: {
+    alignItems: 'flex-end',
+  },
+  coachMessageContainer: {
+    alignItems: 'flex-start',
+  },
+  coachMessage: {
+    backgroundColor: COLORS.background,
+    padding: SPACING.md,
+    paddingBottom: SPACING.xl,
+    borderRadius: 12,
     maxWidth: '80%',
-    padding: 10,
-    marginVertical: 5,
-    borderRadius: 10,
+    borderTopLeftRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   userMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#007AFF',
-  },
-  assistantMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#E5E5EA',
+    backgroundColor: COLORS.primary,
+    padding: SPACING.md,
+    paddingBottom: SPACING.xl,
+    borderRadius: 12,
+    maxWidth: '80%',
+    borderTopRightRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   messageText: {
-    fontSize: 16,
-    color: '#000',
+    ...TYPOGRAPHY.body,
+    color: COLORS.text,
+    lineHeight: 20,
   },
-  timestamp: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 5,
+  userMessageText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.background,
+    lineHeight: 20,
+  },
+  chatCard: {
+    backgroundColor: 'transparent',
+    marginBottom: SPACING.md,
+    shadowOpacity: 0,
+  },
+  tipsCard: {
+    marginTop: SPACING.lg,
+  },
+  tipContent: {
+    padding: SPACING.lg,
+    alignItems: 'center',
+  },
+  tipTitle: {
+    ...TYPOGRAPHY.h3,
+    color: COLORS.text,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  tipText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+    textAlign: 'left',
+    marginTop: SPACING.sm,
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 10,
-    backgroundColor: '#fff',
+    alignItems: 'center',
+    padding: SPACING.sm,
+    backgroundColor: COLORS.background,
     borderTopWidth: 1,
-    borderTopColor: '#ddd',
+    borderTopColor: COLORS.border,
   },
   input: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginRight: 10,
+    ...TYPOGRAPHY.body,
+    color: COLORS.text,
     maxHeight: 100,
+    padding: SPACING.sm,
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    marginRight: SPACING.sm,
   },
   sendButton: {
-    backgroundColor: '#007AFF',
+    padding: SPACING.sm,
+    backgroundColor: COLORS.primary,
     borderRadius: 20,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  loadingContainer: {
-    flex: 1,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  chatListContent: {
-    flexGrow: 1,
-    paddingVertical: 16,
+  sendButtonDisabled: {
+    backgroundColor: COLORS.border,
+  },
+  dateContainer: {
+    alignItems: 'center',
+    marginVertical: SPACING.sm,
+  },
+  dateText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
+    backgroundColor: COLORS.border + '50',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: 12,
+  },
+  timeText: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 11,
+    position: 'absolute',
+    bottom: 4,
+    right: 8,
+  },
+  userTimeText: {
+    color: COLORS.background + '90',
+  },
+  coachTimeText: {
+    color: COLORS.textSecondary,
   },
 }); 

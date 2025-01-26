@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { View, TextInput, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from 'react-native';
 import { updateUserPassword } from '../firebase/auth';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { PageContainer } from '../components/PageContainer';
+import { Header } from '../components/Header';
+import { COLORS, SPACING, TYPOGRAPHY } from '../theme/theme';
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -43,69 +46,69 @@ export const UpdatePasswordScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Passwort ändern</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Aktuelles Passwort"
-        value={currentPassword}
-        onChangeText={setCurrentPassword}
-        secureTextEntry
+    <PageContainer>
+      <Header 
+        title="Passwort ändern"
+        showBack
+        onBackPress={() => navigation.goBack()}
       />
+      <View style={styles.container}>
+        <TextInput
+          style={styles.input}
+          placeholder="Aktuelles Passwort"
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
+          secureTextEntry
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Neues Passwort"
-        value={newPassword}
-        onChangeText={setNewPassword}
-        secureTextEntry
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Neues Passwort"
+          value={newPassword}
+          onChangeText={setNewPassword}
+          secureTextEntry
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Neues Passwort bestätigen"
-        value={confirmNewPassword}
-        onChangeText={setConfirmNewPassword}
-        secureTextEntry
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Neues Passwort bestätigen"
+          value={confirmNewPassword}
+          onChangeText={setConfirmNewPassword}
+          secureTextEntry
+        />
 
-      <TouchableOpacity
-        style={[styles.button, loading ? styles.buttonDisabled : null]}
-        onPress={handleUpdatePassword}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Passwort ändern</Text>
-        )}
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity
+          style={[styles.button, loading ? styles.buttonDisabled : null]}
+          onPress={handleUpdatePassword}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Passwort ändern</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </PageContainer>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    padding: SPACING.lg,
+    backgroundColor: COLORS.background,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: COLORS.border,
     padding: 15,
     borderRadius: 8,
     marginBottom: 15,
+    color: COLORS.text,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.primary,
     padding: 15,
     borderRadius: 8,
     marginBottom: 15,
@@ -114,7 +117,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   buttonText: {
-    color: '#fff',
+    color: COLORS.background,
     textAlign: 'center',
     fontWeight: 'bold',
   },
