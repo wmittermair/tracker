@@ -9,10 +9,10 @@ export const HabitItem: React.FC<HabitItemProps> = ({ habit, onToggle, onDelete 
         style={styles.habitContainer} 
         onPress={() => onToggle(habit.id)}
       >
-        <View style={[styles.checkbox, habit.lastCompletedDate ? styles.checked : styles.unchecked]} />
+        <View style={[styles.checkbox, habit.completedToday ? styles.checked : styles.unchecked]} />
         <View style={styles.textContainer}>
           <Text style={styles.habitName}>{habit.name}</Text>
-          <Text style={styles.streakText}>🔥 {habit.streak} Tage</Text>
+          <Text style={styles.streakText}>🔥 {habit.currentStreak} Tage</Text>
         </View>
       </TouchableOpacity>
       <TouchableOpacity 

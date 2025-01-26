@@ -26,8 +26,8 @@ export const HabitHistory: React.FC<HabitHistoryProps> = ({ history }) => {
   );
 
   // Gruppiere die Tage nach Wochen
-  const weeks: Date[][] = [];
-  let currentWeek: Date[] = [];
+  const weeks: (Date | null)[][] = [];
+  let currentWeek: (Date | null)[] = [];
 
   dateRange.forEach(date => {
     if (currentWeek.length === 0 && date.getDay() !== 1) {

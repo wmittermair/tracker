@@ -4,7 +4,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { CoachScreen } from '../screens/CoachScreen';
-import { SettingsScreen } from '../screens/SettingsScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/theme';
 import { RootStackParamList } from './types';
@@ -45,7 +44,6 @@ export const AppNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={TabNavigator} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   );
 }; 
