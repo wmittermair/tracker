@@ -1,4 +1,4 @@
-rootProject.name = 'tracker'
+rootProject.name = 'Habit Tracker'
 
 dependencyResolutionManagement {
   versionCatalogs {

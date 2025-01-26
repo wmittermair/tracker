@@ -14,10 +14,16 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.tracker.app"
     },
     "web": {
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6ef85b2f-f38b-461f-b99b-6946e5599e89"
+      }
     }
   }
 }

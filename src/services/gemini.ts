@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const GEMINI_API_KEY = 'AIzaSyB4PH7YbDAV3GN2EquaXVFoQ0XMfUvhW8E';
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  throw new Error('EXPO_PUBLIC_GEMINI_API_KEY Umgebungsvariable ist nicht gesetzt');
+}
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
 
 export interface GeminiMessage {
