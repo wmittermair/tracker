@@ -3,50 +3,44 @@ import { View, StyleSheet, TextInput, TouchableOpacity, Text, ScrollView, Activi
 import { HabitItem } from '../components/HabitItem';
 import { Habit } from '../types/types';
 import { addHabit, loadHabits, toggleHabit, deleteHabit, testFirestore } from '../firebase/habits';
+import { useAuth } from '../firebase/auth';
 
 export const HomeScreen = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [newHabitName, setNewHabitName] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
-  // Habits beim Start laden
   useEffect(() => {
-    const init = async () => {
-      try {
-        // Firestore-Test durchführen
-        const testResult = await testFirestore();
-        if (!testResult) {
-          setError('Firestore-Verbindung fehlgeschlagen');
-          setLoading(false);
-          return;
-        }
+    if (user) {
+      loadHabitData();
+    } else {
+      setHabits([]);
+    }
+  }, [user]);
 
-        const loadedHabits = await loadHabits();
-        setHabits(loadedHabits);
-        setError(null);
-      } catch (error) {
-        console.error('Fehler beim Laden der Habits:', error);
-        setError('Fehler beim Laden der Habits');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    init();
-  }, []);
+  const loadHabitData = async () => {
+    if (!user) return;
+    try {
+      setIsLoading(true);
+      const loadedHabits = await loadHabits(user.uid);
+      setHabits(loadedHabits);
+    } catch (error) {
+      console.error('Fehler beim Laden der Habits:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAddHabit = async () => {
-    if (newHabitName.trim()) {
-      try {
-        const newHabit = await addHabit(newHabitName.trim());
-        setHabits([newHabit, ...habits]);
-        setNewHabitName('');
-        setError(null);
-      } catch (error) {
-        console.error('Fehler beim Hinzufügen des Habits:', error);
-        setError('Fehler beim Hinzufügen des Habits');
-      }
+    if (!newHabitName.trim() || !user) return;
+    
+    try {
+      const newHabit = await addHabit(user.uid, newHabitName.trim());
+      setHabits(prevHabits => [newHabit, ...prevHabits]);
+      setNewHabitName('');
+    } catch (error) {
+      console.error('Fehler beim Hinzufügen des Habits:', error);
     }
   };
 
@@ -55,30 +49,9 @@ export const HomeScreen = () => {
     if (habit) {
       try {
         await toggleHabit(habit);
-        const updatedHabits = habits.map(h => {
-          if (h.id === id) {
-            const now = new Date();
-            return {
-              ...h,
-              lastCompletedDate: h.lastCompletedDate ? null : now,
-              streak: h.lastCompletedDate ? 0 : h.streak + 1,
-              history: [
-                ...h.history,
-                {
-                  date: now.toISOString().split('T')[0],
-                  completed: !h.lastCompletedDate,
-                  timestamp: now
-                }
-              ]
-            };
-          }
-          return h;
-        });
-        setHabits(updatedHabits);
-        setError(null);
+        await loadHabitData();
       } catch (error) {
         console.error('Fehler beim Aktualisieren des Habits:', error);
-        setError('Fehler beim Aktualisieren des Habits');
       }
     }
   };
@@ -86,15 +59,13 @@ export const HomeScreen = () => {
   const handleDeleteHabit = async (id: string) => {
     try {
       await deleteHabit(id);
-      setHabits(habits.filter(habit => habit.id !== id));
-      setError(null);
+      setHabits(prevHabits => prevHabits.filter(habit => habit.id !== id));
     } catch (error) {
       console.error('Fehler beim Löschen des Habits:', error);
-      setError('Fehler beim Löschen des Habits');
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
@@ -104,11 +75,6 @@ export const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}

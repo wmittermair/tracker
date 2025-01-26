@@ -1,16 +1,16 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { Platform } from 'react-native';
 
 // Firebase Konfiguration
 const firebaseConfig = {
-  apiKey: "AIzaSyBxOUbIDu5LLfxLaEZbiApNIRoAFHh1TjM",
-  authDomain: "wolfgang-habit-tracker.firebaseapp.com",
-  projectId: "wolfgang-habit-tracker",
-  storageBucket: "wolfgang-habit-tracker.appspot.com",
-  messagingSenderId: "705064687909",
-  appId: "1:705064687909:web:20861ec8882e18cc9ae2cc"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
 // Firebase initialisieren
@@ -19,17 +19,9 @@ const app = initializeApp(firebaseConfig);
 // Auth initialisieren
 const auth = getAuth(app);
 
-// Persistenz auf "local" setzen
-setPersistence(auth, browserLocalPersistence)
-  .then(() => {
-    console.log('Firebase Auth Persistenz auf "local" gesetzt');
-  })
-  .catch((error) => {
-    console.error('Fehler beim Setzen der Persistenz:', error);
-  });
+// Firestore mit angepassten Einstellungen für Mobile
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: Platform.OS !== 'web',
+});
 
-// Firestore initialisieren
-const db = getFirestore(app);
-
-export { db, auth };
-export default app; 
+export { auth, db }; 

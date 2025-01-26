@@ -14,8 +14,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const handleLogin = async () => {
     try {
       await loginUser(email, password);
-      // Navigation zur Hauptapp nach erfolgreicher Anmeldung
-      navigation.replace('Home');
+      // Navigation zur Main-Route nach erfolgreicher Anmeldung
+      // Der RootNavigator wird automatisch zur Main-Route wechseln
+      // wenn der Auth-Status sich ändert
     } catch (error: any) {
       Alert.alert('Fehler', error.message);
     }

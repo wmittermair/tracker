@@ -6,6 +6,8 @@ import { ProfileScreen } from '../screens/ProfileScreen';
 import { UpdateEmailScreen } from '../screens/UpdateEmailScreen';
 import { UpdatePasswordScreen } from '../screens/UpdatePasswordScreen';
 import { Ionicons } from '@expo/vector-icons';
+import { CoachChatScreen } from '../screens/CoachChatScreen';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const Tab = createBottomTabNavigator();
 const ProfileStack = createNativeStackNavigator();
@@ -49,6 +51,8 @@ export const MainNavigator = () => {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
+          } else if (route.name === 'CoachChat') {
+            iconName = focused ? 'chat' : 'chat-outline';
           }
 
           return <Ionicons name={iconName as any} size={size} color={color} />;
@@ -70,6 +74,16 @@ export const MainNavigator = () => {
         options={{
           title: 'Profil',
           headerShown: false,
+        }}
+      />
+      <Tab.Screen
+        name="CoachChat"
+        component={CoachChatScreen}
+        options={{
+          tabBarLabel: 'Coach',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="chat" size={size} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>

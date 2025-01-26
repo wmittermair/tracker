@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { getCurrentUser, logoutUser } from '../firebase/auth';
+import { useAuth, logoutUser } from '../firebase/auth';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { CommonActions } from '@react-navigation/native';
@@ -11,7 +11,7 @@ type Props = {
 };
 
 export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 

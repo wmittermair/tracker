@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "tracker",
-    "slug": "tracker",
+    "name": "Habit Tracker",
+    "slug": "habit-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
-    "updates": {
-      "enabled": false
-    },
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true
     },
